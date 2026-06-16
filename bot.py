@@ -23,6 +23,7 @@ import numpy as np
 import urllib.parse
 import base64
 import io
+import json
 from datetime import datetime, timedelta, timezone
 
 warnings.filterwarnings("ignore")
@@ -69,11 +70,16 @@ APIFY_TOKENS = list(set([k.strip() for k in apify_env.split(',') if k.strip()]))
 SHEET_ID = os.environ.get("SHEET_ID")
 GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID")
 IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
+CREDENTIALS_JSON = os.environ.get("CREDENTIALS_JSON")
 
 print(f"โหลด YouTube Keys: {len(YOUTUBE_API_KEYS)} ตัว")
 print(f"โหลด Apify Tokens: {len(APIFY_TOKENS)} ตัว")
 if IMGBB_API_KEY:
     print("✅ ตรวจพบ IMGBB_API_KEY จะใช้ระบบฝากรูป ImgBB แทน Google Drive")
+if CREDENTIALS_JSON:
+    print("✅ ตรวจพบ CREDENTIALS_JSON สำหรับ Google service account")
+else:
+    print("⚠️ ไม่มี CREDENTIALS_JSON secret ตรวจสอบการตั้งค่า Google Sheets/Drive")
 
 # 🔴 WEBHOOK URL
 GOOGLE_CHAT_WEBHOOK = "https://chat.googleapis.com/v1/spaces/AAQAGsvHT0c/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=_gjfX3kZs7NEU6fxNYYTvVkhZFEC7WkwfEdxZ0fvKTw"
@@ -91,12 +97,19 @@ APIFY_RATE_PER_RESULT = 0.004
 
 # --- Authentication (Sheet & Drive) ---
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+creds = None
 try:
-    creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+    if CREDENTIALS_JSON:
+        credentials_dict = json.loads(CREDENTIALS_JSON)
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
+    else:
+        raise ValueError('CREDENTIALS_JSON is not set')
     gc = gspread.authorize(creds)
     drive_service = build('drive', 'v3', credentials=creds)
 except Exception as e:
     print(f"⚠️ [Auth Issue - Not Critical if running on Colab]: {e}")
+    gc = None
+    drive_service = None
 
 def get_bkk_now(): 
     return datetime.now(BKK_TZ)
