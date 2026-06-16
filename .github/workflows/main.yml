@@ -24,9 +24,13 @@ jobs:
 
       - name: Download AI Model from Google Drive
         run: |
-          gdown ${{ secrets.MODEL_FILE_ID }} -O bigc_model.pth
-          if [ ! -f bigc_model.pth ]; then
-            echo "⚠️ Model file not found, bot will run without AI detection"
+          if [ -z "${{ secrets.MODEL_FILE_ID }}" ]; then
+            echo "⚠️ MODEL_FILE_ID secret not set, skipping model download (bot will run without AI detection)"
+          else
+            gdown "${{ secrets.MODEL_FILE_ID }}" -O bigc_model.pth
+            if [ ! -f bigc_model.pth ]; then
+              echo "⚠️ Model file download failed, bot will run without AI detection"
+            fi
           fi
 
       - name: Create credentials.json from Secret
