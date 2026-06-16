@@ -163,7 +163,7 @@ def generate_summary_message(name_group, p_list, raw, unique, dup, chat):
 
 def update_heartbeat(ws_control):
     try: 
-        ws_control.update_cell(9, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
+        ws_control.update_cell(11, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
     except: 
         pass
 
