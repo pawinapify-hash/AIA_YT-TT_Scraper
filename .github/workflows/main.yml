@@ -35,18 +35,18 @@ jobs:
           CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
         run: |
           python - <<'PY'
-import json, os, sys
-creds = os.environ.get('CREDENTIALS_JSON', '')
-if not creds.strip():
-    sys.exit('❌ CREDENTIALS_JSON secret is empty or missing')
-try:
-    json.loads(creds)
-except Exception as e:
-    sys.exit(f'❌ Invalid JSON in CREDENTIALS_JSON secret: {e}')
-with open('credentials.json', 'w', newline='\n') as f:
-    f.write(creds)
-print('✅ credentials.json created successfully')
-PY
+            import json, os, sys
+            creds = os.environ.get('CREDENTIALS_JSON', '')
+            if not creds.strip():
+                sys.exit('❌ CREDENTIALS_JSON secret is empty or missing')
+            try:
+                json.loads(creds)
+            except Exception as e:
+                sys.exit(f'❌ Invalid JSON in CREDENTIALS_JSON secret: {e}')
+            with open('credentials.json', 'w', newline='\n') as f:
+                f.write(creds)
+            print('✅ credentials.json created successfully')
+            PY
 
       - name: Run Bot Script
         env:
