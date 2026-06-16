@@ -22,13 +22,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install yt-dlp apify-client gspread opencv-python torch torchvision gdown google-api-python-client google-auth-oauthlib
 
-      - name: Download AI Model from Google Drive
-        if: ${{ secrets.MODEL_FILE_ID != '' }}
-        run: |
-          gdown "${{ secrets.MODEL_FILE_ID }}" -O bigc_model.pth
-          if [ ! -f bigc_model.pth ]; then
-            echo "⚠️ Model file download failed, bot will run without AI detection"
-          fi
+      # - name: Download AI Model from Google Drive
+      #   if: ${{ secrets.MODEL_FILE_ID != '' }}
+      #   run: |
+      #     gdown "${{ secrets.MODEL_FILE_ID }}" -O bigc_model.pth
+      #     if [ ! -f bigc_model.pth ]; then
+      #       echo "⚠️ Model file download failed, bot will run without AI detection"
+      #     fi
 
       - name: Create credentials.json from Secret
         run: |
