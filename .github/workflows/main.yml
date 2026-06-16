@@ -31,12 +31,22 @@ jobs:
       #     fi
 
       - name: Create credentials.json from Secret
+        env:
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
         run: |
-          echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
-          if [ ! -s credentials.json ]; then
-            echo "❌ credentials.json is empty or invalid"
-            exit 1
-          fi
+          python - <<'PY'
+import json, os, sys
+creds = os.environ.get('CREDENTIALS_JSON', '')
+if not creds.strip():
+    sys.exit('❌ CREDENTIALS_JSON secret is empty or missing')
+try:
+    json.loads(creds)
+except Exception as e:
+    sys.exit(f'❌ Invalid JSON in CREDENTIALS_JSON secret: {e}')
+with open('credentials.json', 'w', newline='\n') as f:
+    f.write(creds)
+print('✅ credentials.json created successfully')
+PY
 
       - name: Run Bot Script
         env:
