@@ -542,8 +542,8 @@ def main():
             run_mode = str(config[4]).strip()
 
             try:
-                budget_limit = int(config[7]) if len(config) > 7 and str(config[7]).strip().isdigit() else DEFAULT_BUDGET_LIMIT
-            except:
+                budget_limit = float(config[7]) if len(config) > 7 and str(config[7]).strip() else DEFAULT_BUDGET_LIMIT
+            except (ValueError, TypeError):
                 budget_limit = DEFAULT_BUDGET_LIMIT
 
             try:
