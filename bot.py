@@ -180,31 +180,30 @@ def update_heartbeat(ws_control):
     except: 
         pass
 
-def check_and_reset_monthly_budget(ws_control, budget_limit):
+def check_and_reset_daily_budget(ws_control, budget_limit):
     """
-    Reset remaining budget to limit at the start of each month.
+    Reset remaining budget to limit at the start of each day.
     Stores the last reset date in Control_Panel B12.
     """
     try:
         current_date = get_bkk_now()
-        current_month = current_date.strftime('%Y-%m')
+        current_date_str = current_date.strftime('%Y-%m-%d')
         
-        # Read last reset date from B11
+        # Read last reset date from B12
         try:
-            last_reset_str = ws_control.cell(11, 2).value
-            last_reset_month = last_reset_str.split('-')[0:2] if last_reset_str else None
-            last_reset_month = '-'.join(last_reset_month) if last_reset_month else None
+            last_reset_str = ws_control.cell(12, 2).value
+            last_reset_date = str(last_reset_str).strip()[:10] if last_reset_str else None
         except:
-            last_reset_month = None
+            last_reset_date = None
         
-        # If month changed or never reset, reset the budget
-        if last_reset_month != current_month:
+        # If date changed or never reset, reset the budget
+        if last_reset_date != current_date_str:
             ws_control.update_cell(10, 2, str(round(float(budget_limit), 4)))
-            ws_control.update_cell(11, 2, current_date.strftime('%Y-%m-%d'))
-            print(f"✅ Monthly Budget Reset: {current_month} | Remaining: {budget_limit}$")
+            ws_control.update_cell(12, 2, current_date_str)
+            print(f"✅ Daily Budget Reset: {current_date_str} | Remaining: {budget_limit}$")
             return float(budget_limit)
     except Exception as e:
-        print(f"⚠️ Monthly Budget Check Error: {e}")
+        print(f"⚠️ Daily Budget Check Error: {e}")
     
     return None
 
@@ -551,8 +550,8 @@ def main():
             except:
                 budget_remaining = float(budget_limit)
 
-            # Check if we need to reset budget at start of month
-            reset_budget = check_and_reset_monthly_budget(ws_control, budget_limit)
+            # Check if we need to reset budget at start of day
+            reset_budget = check_and_reset_daily_budget(ws_control, budget_limit)
             if reset_budget is not None:
                 budget_remaining = reset_budget
 
