@@ -382,9 +382,24 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                 if plat == 'TikTok':
                     clean_kw = kw.replace("#", "").strip()
                     inp = {
-                        "maxItems": max_res,
+                        "commentsPerPost": 0,
+                        "excludePinnedPosts": False,
+                        "maxFollowersPerProfile": 0,
+                        "maxFollowingPerProfile": 0,
+                        "maxProfilesPerQuery": 1,
+                        "maxRepliesPerComment": 0,
+                        "proxyCountryCode": "TH",
                         "resultsPerPage": max_res,
-                        "proxyConfiguration": {"useApifyProxy": True}
+                        "scrapeRelatedVideos": False,
+                        "searchSection": "/video",
+                        "shouldDownloadAvatars": False,
+                        "shouldDownloadCovers": False,
+                        "shouldDownloadMusicCovers": False,
+                        "shouldDownloadSlideshowImages": False,
+                        "shouldDownloadVideos": False,
+                        "topLevelCommentsPerPost": 0,
+                        "videoSearchDateFilter": "PAST_24_HOURS",
+                        "videoSearchSorting": "MOST_RELEVANT"
                     }
                     if kw.startswith('#'):
                         inp["hashtags"] = [clean_kw]
