@@ -429,6 +429,11 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                     if not apify_token or "ใส่_" in apify_token: continue
                     try:
                         client = ApifyClient(apify_token)
+                        # Log the actor, keyword and input payload so we can verify the actual query sent to Apify
+                        try:
+                            print(f"  🔎 Apify actor call: actor={actor}, keyword={kw}, input={json.dumps(inp, ensure_ascii=False)}")
+                        except Exception:
+                            print(f"  🔎 Apify actor call: actor={actor}, keyword={kw}, input={inp}")
                         run = client.actor(actor).call(run_input=inp, timeout_secs=120)
                         
                         count_apify = 0
