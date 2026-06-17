@@ -180,6 +180,34 @@ def update_heartbeat(ws_control):
     except: 
         pass
 
+def check_and_reset_monthly_budget(ws_control, budget_limit):
+    """
+    Reset remaining budget to limit at the start of each month.
+    Stores the last reset date in Control_Panel B12.
+    """
+    try:
+        current_date = get_bkk_now()
+        current_month = current_date.strftime('%Y-%m')
+        
+        # Read last reset date from B12
+        try:
+            last_reset_str = ws_control.cell(12, 2).value
+            last_reset_month = last_reset_str.split('-')[0:2] if last_reset_str else None
+            last_reset_month = '-'.join(last_reset_month) if last_reset_month else None
+        except:
+            last_reset_month = None
+        
+        # If month changed or never reset, reset the budget
+        if last_reset_month != current_month:
+            ws_control.update_cell(10, 2, str(round(float(budget_limit), 4)))
+            ws_control.update_cell(12, 2, current_date.strftime('%Y-%m-%d'))
+            print(f"✅ Monthly Budget Reset: {current_month} | Remaining: {budget_limit}$")
+            return float(budget_limit)
+    except Exception as e:
+        print(f"⚠️ Monthly Budget Check Error: {e}")
+    
+    return None
+
 def load_ai_model():
     if os.path.exists(MODEL_PATH):
         try:
@@ -519,9 +547,14 @@ def main():
                 budget_limit = DEFAULT_BUDGET_LIMIT
 
             try:
-                budget_remaining = float(config[8]) if len(config) > 8 and str(config[8]).strip() else float(budget_limit)
+                budget_remaining = float(config[9]) if len(config) > 9 and str(config[9]).strip() else float(budget_limit)
             except:
                 budget_remaining = float(budget_limit)
+
+            # Check if we need to reset budget at start of month
+            reset_budget = check_and_reset_monthly_budget(ws_control, budget_limit)
+            if reset_budget is not None:
+                budget_remaining = reset_budget
 
             print(f"\n\n🔥 Processing Batch: {get_bkk_now().strftime('%H:%M:%S')} (Max Results: {max_res}, Budget Remaining: {budget_remaining}$)")
             raw_list, budget_remaining = fetch_data(platforms, keywords, max_res, days_back, budget_remaining)
