@@ -189,9 +189,9 @@ def check_and_reset_monthly_budget(ws_control, budget_limit):
         current_date = get_bkk_now()
         current_month = current_date.strftime('%Y-%m')
         
-        # Read last reset date from B12
+        # Read last reset date from B11
         try:
-            last_reset_str = ws_control.cell(12, 2).value
+            last_reset_str = ws_control.cell(11, 2).value
             last_reset_month = last_reset_str.split('-')[0:2] if last_reset_str else None
             last_reset_month = '-'.join(last_reset_month) if last_reset_month else None
         except:
@@ -200,7 +200,7 @@ def check_and_reset_monthly_budget(ws_control, budget_limit):
         # If month changed or never reset, reset the budget
         if last_reset_month != current_month:
             ws_control.update_cell(10, 2, str(round(float(budget_limit), 4)))
-            ws_control.update_cell(12, 2, current_date.strftime('%Y-%m-%d'))
+            ws_control.update_cell(11, 2, current_date.strftime('%Y-%m-%d'))
             print(f"✅ Monthly Budget Reset: {current_month} | Remaining: {budget_limit}$")
             return float(budget_limit)
     except Exception as e:
@@ -547,7 +547,7 @@ def main():
                 budget_limit = DEFAULT_BUDGET_LIMIT
 
             try:
-                budget_remaining = float(config[9]) if len(config) > 9 and str(config[9]).strip() else float(budget_limit)
+                budget_remaining = float(config[8]) if len(config) > 8 and str(config[8]).strip() else float(budget_limit)
             except:
                 budget_remaining = float(budget_limit)
 
@@ -658,7 +658,7 @@ def main():
                     print(f"  ❌ เขียนลง Sheet ไม่สำเร็จ: {sheet_err}")
 
             try:
-                ws_control.update_cell(10, 2, str(round(budget_remaining, 4)))
+                ws_control.update_cell(9, 2, str(round(budget_remaining, 4)))
                 print(f"🔄 Updated Today's Remaining Budget: {round(budget_remaining, 4)}$")
             except Exception as e:
                 print(f"⚠️ Failed to persist today's remaining budget: {e}")
