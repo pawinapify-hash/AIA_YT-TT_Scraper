@@ -625,7 +625,7 @@ def main():
                     print(f"  ❌ เขียนลง Sheet ไม่สำเร็จ: {sheet_err}")
 
             try:
-                ws_control.update_cell(9, 2, str(round(budget_remaining, 4)))
+                ws_control.update_cell(10, 2, str(round(budget_remaining, 4)))
                 print(f"🔄 Updated Today's Remaining Budget: {round(budget_remaining, 4)}$")
             except Exception as e:
                 print(f"⚠️ Failed to persist today's remaining budget: {e}")
