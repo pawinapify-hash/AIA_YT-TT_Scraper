@@ -388,7 +388,7 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                         "maxFollowingPerProfile": 0,
                         "maxProfilesPerQuery": 1,
                         "maxRepliesPerComment": 0,
-                        "proxyCountryCode": "TH",
+                        "proxyCountryCode": "None",
                         "resultsPerPage": max_res,
                         "scrapeRelatedVideos": False,
                         "searchSection": "/video",
