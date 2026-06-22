@@ -82,9 +82,8 @@ else:
     print("⚠️ ไม่มี CREDENTIALS_JSON secret ตรวจสอบการตั้งค่า Google Sheets/Drive")
 
 # 🔴 WEBHOOK URL
-GOOGLE_CHAT_WEBHOOK = "https://chat.googleapis.com/v1/spaces/AAQAGsvHT0c/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=_gjfX3kZs7NEU6fxNYYTvVkhZFEC7WkwfEdxZ0fvKTw"
-GOOGLE_CHAT_WEBHOOK_TIKTOK = "https://chat.googleapis.com/v1/spaces/AAQAtSkMPnY/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=WhACImSKOnMpTU-3iyj92I-y6xmDd3KDHZtVY7GehNQ"
-
+GOOGLE_CHAT_WEBHOOK = "https://chat.googleapis.com/v1/spaces/AAQAVJqrmLA/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=ou91FN0mQsnKko53YBsr3O7UEPdlaZVWgBHXeZcg5Gk"
+GOOGLE_CHAT_WEBHOOK_TIKTOK = "https://chat.googleapis.com/v1/spaces/AAQAVJqrmLA/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=ou91FN0mQsnKko53YBsr3O7UEPdlaZVWgBHXeZcg5Gk"
 BASE_PATH = './'
 RESULTS_PATH = os.path.join(BASE_PATH, 'Results')
 os.makedirs(RESULTS_PATH, exist_ok=True)
