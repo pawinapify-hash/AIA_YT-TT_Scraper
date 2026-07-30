@@ -14,6 +14,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from platform_config import get_apify_actor_config
+from apify_result_parser import normalize_apify_item
 
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -391,46 +392,10 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                             if count_apify >= max_res: break
                             if not item or 'error' in item: continue
 
-                            raw_date = item.get('createTime') or item.get('createdAt') or item.get('timestamp') or item.get('date') or item.get('create_time')
-                            is_old = False
-                            try:
-                                if raw_date:
-                                    rd = float(raw_date) if isinstance(raw_date, str) and raw_date.replace('.', '', 1).isdigit() else raw_date
-                                    if isinstance(rd, (int, float)):
-                                        dt_utc = datetime.fromtimestamp(rd if rd < 1e11 else rd/1000.0, timezone.utc)
-                                    else:
-                                        clean_str = str(rd).replace('Z', '+00:00')[:19] + '+00:00'
-                                        dt_utc = datetime.fromisoformat(clean_str)
-                                    
-                                    if dt_utc < cutoff_utc:
-                                        is_old = True
-                            except: 
-                                pass
-                            
-                            user = "Unknown"
-                            if isinstance(item.get('authorMeta'), dict): user = item['authorMeta'].get('name') or item['authorMeta'].get('nickName') or "Unknown"
-                            elif isinstance(item.get('author'), dict): user = item['author'].get('uniqueId') or item['author'].get('nickname') or "Unknown"
-                            elif isinstance(item.get('author'), str): user = item['author']
-                            if user == "Unknown" or not user: user = item.get('authorNickname') or item.get('authorName') or item.get('ownerUsername') or item.get('author_id') or "Unknown"
-                                
-                            title_raw = item.get('caption') or item.get('text') or item.get('desc') or item.get('title') or item.get('video_description') or "No Title"
-                            if isinstance(title_raw, dict): title_raw = title_raw.get('text', 'No Title')
-                            title = str(title_raw)
-                            
-                            item_id = item.get('id') or item.get('video', {}).get('id') or item.get('video_id')
-                            if not item_id: item_id = str(random.randint(10000, 99999))
-                            
-                            v_url = item.get('webVideoUrl') or item.get('videoWebUrl') or item.get('url') or item.get('postUrl') or item.get('video_url')
-                            if not v_url and plat == 'TikTok': v_url = f"https://www.tiktok.com/@{user}/video/{item_id}"
-                            
-                            image_url = item.get('displayUrl') or item.get('imageUrl') or item.get('coverUrl') or item.get('video', {}).get('cover') or item.get('origin_cover') or item.get('videoMeta', {}).get('coverUrl')
-
-                            if v_url:
-                                all_videos.append({
-                                    'url': str(v_url), 'title': str(title)[:200], 'platform': str(plat), 'user': str(user), 
-                                    'date': format_to_bkk(raw_date), 'id': str(item_id), 'image_url': str(image_url) if image_url else None,
-                                    'is_old': is_old 
-                                })
+                            normalized = normalize_apify_item(item, plat, cutoff_utc)
+                            if normalized and normalized.get('url'):
+                                normalized['date'] = format_to_bkk(normalized.get('date'))
+                                all_videos.append(normalized)
                                 count_apify += 1
                         
                         success = True
