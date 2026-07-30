@@ -1,16 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-🚀 INTELLIGENT LOGO HUNTER v8.2.1 (Ultimate GitHub Edition - Stable Restore)
-- โค้ดรุ่นเสถียรรักษาโครงสร้าง v7.9.1 ดั้งเดิม 100% เชื่อมต่อ Secrets บัญชีใหม่ปลอดภัย
-- 🛠️ แก้ปัญหาภาพหลักฐานไม่ขึ้น (-) ด้วยระบบฝากรูปฟรีสำรองอัตโนมัติ (Catbox & Tmpfiles) เมื่อ Google Drive พื้นที่เต็ม
-- ใช้การค้นหาผ่าน 'clockworks/tiktok-scraper' ดึงค่าตัวแปรจากแถวเดิมคงที่ (B1 - B7)
-- ระบบ Hard Limit ป้องกันการดึงคลิปเกินจำนวนที่กำหนด (ประหยัดทรัพยากรเครื่อง)
-- เพิ่มระบบ Retry ป้องกัน Google Sheets API Error 503 ล่มชั่วคราว
-- อ่านค่า Time Filter แบบเดิม (1=Day, 2=Week, 3=Month)
-- เก็บ Log คลิปเก่ารวมในลิสต์ "ซ้ำ" แต่ไม่สแกนและไม่ลง Sheet Apify
-- Batch Insert แทรก "FALSE" ให้ Checkbox ใช้งานได้ (คอลัมน์ I), Timestamp (คอลัมน์ J)
-"""
-
 import os
 import sys
 import time
@@ -25,6 +12,8 @@ import base64
 import io
 import json
 from datetime import datetime, timedelta, timezone
+
+from platform_config import get_apify_actor_config
 
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -375,34 +364,10 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                     print(f"  ❌ YouTube API Keys ทั้งหมดโควตาเต็ม หรือไม่ได้ตั้งค่า!")
 
             else:
-                actor = {'TikTok': 'clockworks/tiktok-scraper', 'Instagram': 'apify/instagram-hashtag-scraper', 'Facebook': 'apify/facebook-search-scraper'}.get(plat)
-                if not actor: continue
-                
-                inp = {}
-                if plat == 'TikTok':
-                    clean_kw = kw.replace("#", "").strip()
-                    inp = {
-                        "maxItems": max_res,
-                        "resultsPerPage": max_res,
-                        "proxyConfiguration": {"useApifyProxy": True}
-                    }
-                    if kw.startswith('#'):
-                        inp["hashtags"] = [clean_kw]
-                    else:
-                        inp["searchQueries"] = [kw]
-                elif plat == 'Instagram':
-                    inp = {
-                        "hashtags": [kw.replace("#", "").replace(" ", "")],
-                        "resultsLimit": max_res,
-                        "proxyConfiguration": {"useApifyProxy": True}
-                    }
-                elif plat == 'Facebook':
-                    inp = {
-                        "searchTerms": kw,
-                        "resultsLimit": max_res,
-                        "maxItems": max_res,
-                        "proxyConfiguration": {"useApifyProxy": True}
-                    }
+                actor, inp = get_apify_actor_config(plat, kw, max_res)
+                if not actor:
+                    print(f"  ℹ️ No Apify actor configured for {plat} yet.")
+                    continue
                 
                 success = False
                 estimated_apify_cost = max_res * APIFY_RATE_PER_RESULT
