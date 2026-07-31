@@ -126,6 +126,14 @@ def sanitize_for_sheets(text):
         clean_text = f"'{clean_text}"
     return clean_text[:2500]
 
+
+def is_run_active(status):
+    if status is None:
+        return False
+
+    status_text = str(status).strip()
+    return "Start" in status_text or "🟢" in status_text
+
 def send_google_chat_message(message, webhook_url):
     if not webhook_url or not webhook_url.startswith("http"): return
     try:
@@ -463,10 +471,9 @@ def main():
             config = ws_control.col_values(2)
             status = str(config[0]).strip() if len(config) > 0 else "🔴 Stop"
 
-            if 'Start' not in status and '🟢' not in status:
-                print(f"\r⏳ [Standby] Waiting for command... ({get_bkk_now().strftime('%H:%M:%S')})", end="")
-                time.sleep(15)
-                continue
+            if not is_run_active(status):
+                print(f"\n🛑 Stop signal detected from Control_Panel. Exiting loop.")
+                break
 
             platforms = [p.strip() for p in config[1].split(',')]
             keywords = [k.strip() for k in config[2].split(',')]
