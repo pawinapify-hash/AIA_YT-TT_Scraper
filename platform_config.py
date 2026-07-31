@@ -1,9 +1,8 @@
-def get_apify_actor_config(platform, keyword, max_results):
-    """Return the Apify actor name and input payload for a platform.
+from datetime import datetime, timedelta, timezone
 
-    LinkedIn is intentionally left blank for now so the actor name and
-    parameter payload can be filled in later without changing the flow.
-    """
+
+def get_apify_actor_config(platform, keyword, max_results, time_window_days=None):
+    """Return the Apify actor name and input payload for a platform."""
     if platform == "TikTok":
         clean_kw = keyword.replace("#", "").strip()
         payload = {
@@ -45,6 +44,18 @@ def get_apify_actor_config(platform, keyword, max_results):
             "searchQueries": [keyword],
             "sortBy": "relevance",
         }
+        if time_window_days is None:
+            time_window_days = 30
+
+        if time_window_days == 1:
+            days_back = 1
+        elif time_window_days == 2:
+            days_back = 7
+        else:
+            days_back = 30
+
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days_back)).date().isoformat()
+        payload["postedLimitDate"] = cutoff_date
         return "harvestapi/linkedin-post-search", payload
 
     return "", {}

@@ -373,7 +373,7 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                     print(f"  ❌ YouTube API Keys ทั้งหมดโควตาเต็ม หรือไม่ได้ตั้งค่า!")
 
             else:
-                actor, inp = get_apify_actor_config(plat, kw, max_res)
+                actor, inp = get_apify_actor_config(plat, kw, max_res, days_back)
                 if not actor:
                     print(f"  ℹ️ No Apify actor configured for {plat} yet.")
                     continue
@@ -403,6 +403,8 @@ def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
                             normalized = normalize_apify_item(item, plat, cutoff_utc)
                             if normalized and normalized.get('url'):
                                 normalized['date'] = format_to_bkk(normalized.get('date'))
+                                if plat == 'LinkedIn' and normalized.get('is_old'):
+                                    continue
                                 all_videos.append(normalized)
                                 count_apify += 1
                         
