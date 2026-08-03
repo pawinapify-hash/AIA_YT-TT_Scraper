@@ -1,9 +1,9 @@
-name: Logo Hunter Bot (GAS Triggered)
+name: Scraper Bot (GAS Triggered)
 
 on:
   repository_dispatch:
-    types: [trigger-from-gas] # 🟢 รอรับคำสั่งที่ส่งมาจาก Google Apps Script
-  workflow_dispatch:          # 🟢 ปุ่มกดรันเองด้วยมือ เผื่อต้องการทดสอบระบบบน GitHub
+    types: [trigger-from-gas]
+  workflow_dispatch:
 
 jobs:
   run-bot:
@@ -20,21 +20,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yt-dlp apify-client gspread opencv-python torch torchvision gdown google-api-python-client google-auth-oauthlib
-
-      # - name: Download AI Model from Google Drive
-      #   if: ${{ secrets.MODEL_FILE_ID != '' }}
-      #   run: |
-      #     gdown "${{ secrets.MODEL_FILE_ID }}" -O bigc_model.pth
-      #     if [ ! -f bigc_model.pth ]; then
-      #       echo "⚠️ Model file download failed, bot will run without AI detection"
+          pip install yt-dlp apify-client gspread google-api-python-client google-auth-oauthlib
 
       - name: Run Bot Script
         env:
           YOUTUBE_API_KEYS: ${{ secrets.YOUTUBE_API_KEYS }}
           APIFY_TOKENS: ${{ secrets.APIFY_TOKENS }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
-          IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
         run: python bot.py

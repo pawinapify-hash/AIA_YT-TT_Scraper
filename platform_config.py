@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 
-def get_apify_actor_config(platform, keyword, max_results, time_window_days=None):
+def get_apify_actor_config(platform, key word, max_results, time_window_days=None):
     """Return the Apify actor name and input payload for a platform."""
     if platform == "TikTok":
         clean_kw = keyword.replace("#", "").strip()

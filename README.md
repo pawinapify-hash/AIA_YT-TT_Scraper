@@ -1,79 +1,62 @@
-# Logo Hunter Bot
+# AIA Social Media Scraper
 
 ## Overview
-This repository contains a single-script monitoring bot for automated social media scanning and logo detection. It searches for new posts on YouTube, TikTok, Instagram, and Facebook, analyzes the content for logo appearances, and writes results to a Google Sheet. When a logo is detected, the bot can also upload evidence images and send summary notifications.
+Automated social media scraper that searches for new posts on YouTube, TikTok, Instagram, Facebook, and LinkedIn, then writes results to a Google Sheet with deduplication. Sends summary notifications to Google Chat webhooks.
 
-The main use case is keyword-based monitoring, deduplication of previously seen posts, and logging new content while avoiding older items.
+## How it works
 
-## What the bot does
-- Reads platform and keyword configuration from a Google Sheet.
-- Uses the YouTube Data API for YouTube searches.
-- Uses Apify actors to scrape TikTok, Instagram, and Facebook search results.
-- Detects whether a logo is present in frames or thumbnails using a local PyTorch model when available.
-- Saves evidence images through ImgBB, Google Drive, or fallback services such as Catbox and Tmpfiles.
-- Logs results to a Google Sheet with metadata such as URL, title, user, platform, detection result, and timestamp.
-- Sends summary updates to Google Chat webhooks.
-- Supports execution in a GitHub-style environment as well as Colab-style setups.
+1. Reads platform and keyword configuration from the `Control_Panel` worksheet in Google Sheets
+2. Searches **YouTube** via the YouTube Data API v3
+3. Searches **TikTok, Instagram, Facebook, LinkedIn** via Apify actors with budget tracking
+4. Deduplicates results against previously logged URLs in the `Apify` worksheet
+5. Writes new posts to the `Apify` worksheet (columns: date, title, platform, user, URL, timestamp)
+6. Logs scan summaries to the `Scan_Logs` worksheet
+7. Sends Google Chat notifications for new posts (general webhook + TikTok-specific webhook)
+8. Tracks a daily Apify API budget with automatic reset at midnight (Bangkok time)
 
-## Repository files
-### `bot.py`
-This is the main and only application file in the repository. It contains:
-- dependency installation and imports
-- Google Sheets and Drive authentication
-- environment-based API key loading
-- text sanitizing, notification, and heartbeat helpers
-- the main fetch logic for YouTube, TikTok, Instagram, and Facebook
-- deduplication logic and old-content filtering
-- AI model loading and logo prediction
-- evidence-image upload and fallback handling
-- batch insertion into the Google Sheet
-- the repeated execution loop and configuration handling
+## Run modes
 
-### `.git/` and `.github/`
-These are repository metadata directories created by Git and GitHub. They are not part of the bot logic itself, but may contain version history and workflow configuration.
-
-## Required files and assets
-- `bigc_model.pth`
-  - Optional local AI model file used for logo detection. If it is missing, the bot will still run but skip image/video logo analysis.
+- **Continuous** (Colab): loops indefinitely with a configurable interval between iterations
+- **Run Once** (GitHub Actions / serverless): executes one cycle, writes status to Control_Panel, then exits
 
 ## Environment variables
-The bot reads configuration from environment variables. The most important ones are:
-- `YOUTUBE_API_KEYS`
-  - Comma-separated YouTube API keys used for YouTube search queries.
-- `APIFY_TOKENS`
-  - Comma-separated Apify API tokens used for TikTok, Instagram, and Facebook scrapers.
-- `SHEET_ID`
-  - The Google Sheets ID where the bot writes results and reads control values.
-- `GDRIVE_FOLDER_ID`
-  - Optional Google Drive folder ID for image upload storage.
-- `IMGBB_API_KEY`
-  - Optional ImgBB upload key. If provided, the bot attempts to upload evidence images to ImgBB first.
-- `CREDENTIALS_JSON`
-  - Required service-account JSON content for Google Sheets and Google Drive authentication.
 
-## How to run
-1. Place `bot.py` and optionally `bigc_model.pth` in the same folder.
-2. Set the required environment variables, especially `CREDENTIALS_JSON` and `SHEET_ID`.
-3. Run the script:
+| Variable | Description |
+|----------|-------------|
+| `YOUTUBE_API_KEYS` | Comma-separated YouTube Data API v3 keys |
+| `APIFY_TOKENS` | Comma-separated Apify API tokens |
+| `SHEET_ID` | Google Sheets spreadsheet ID |
+| `CREDENTIALS_JSON` | Service account JSON for Google Sheets auth |
+
+## Google Sheet structure
+
+| Worksheet | Purpose |
+|-----------|---------|
+| `Control_Panel` | Column B: status, platforms, keywords, time window, run mode, interval, max results, budget limit |
+| `Apify` | Stores scraped results — date, title, platform, user, URL, timestamp |
+| `Scan_Logs` | Auto-created; logs timestamp, duplicates, new items, platforms per batch |
+
+## Repository files
+
+| File | Purpose |
+|------|---------|
+| `bot.py` | Main entry point — auto-installs deps, scrapes, deduplicates, writes to sheets, notifies |
+| `platform_config.py` | Apify actor configurations per platform (TikTok, Instagram, Facebook, LinkedIn) |
+| `apify_result_parser.py` | Normalizes raw Apify API responses to a consistent format |
+| `tests/` | Unit tests for parsers, configs, and helpers |
+
+## Dependencies
+
+Installed automatically at runtime: `yt-dlp`, `apify-client`, `gspread`
+
+CI also installs: `google-api-python-client`, `google-auth-oauthlib`
+
+## Usage
 
 ```bash
 python bot.py
 ```
 
-## How the bot is configured
-The bot expects a Google Sheet with at least these worksheets:
-- `Apify`
-  - Used for storing scanned results and metadata.
-- `Control_Panel`
-  - Used for runtime configuration such as start/stop status, platform list, keywords, time filter, interval, run mode, and max results.
-- `Scan_Logs`
-  - Created automatically if missing and used for log history.
+## CI/CD
 
-## Notes
-- The project currently consists of a single Python script: `bot.py`.
-- The bot installs its Python dependencies automatically at runtime if they are missing.
-- If the AI model file is absent, the bot still runs but skips logo detection.
-- The script includes fallback upload support so evidence images can still be shared even if primary upload services fail.
-
-## Summary
-This repository is a monitoring bot that combines social media search, deduplication, AI-based logo detection, and Google Sheet logging. The full application logic is implemented in `bot.py`, and this README documents its current setup, configuration, and behavior.
+GitHub Actions workflow (`.github/workflows/main.yml`) triggers via `repository_dispatch` from Google Apps Script or manual `workflow_dispatch`.
