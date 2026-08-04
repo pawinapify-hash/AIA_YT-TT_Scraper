@@ -456,7 +456,7 @@ def main():
                     print(f"  Sheet write error: {sheet_err}")
 
             try:
-            ws_control.update_cell(3, 2, str(round(global_cfg['overall_remaining'], 4)))
+                ws_control.update_cell(3, 2, str(round(global_cfg['overall_remaining'], 4)))
                 for _plat_name, cfg in platform_configs.items():
                     ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
                 print(f"Updated budget state")
