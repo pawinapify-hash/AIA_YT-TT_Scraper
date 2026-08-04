@@ -68,7 +68,7 @@ APIFY_RATE_PER_RESULT = {
     'Facebook':  0.004,
 }
 
-CFG_RANGE = 'B1:F14'
+CFG_RANGE = 'B1:F13'
 PLATFORM_COL_INDEX = {
     'Facebook':  2,
     'Instagram': 3,
@@ -86,9 +86,8 @@ ROW_REMAINING   = 11
 CELL_SYS_STATUS     = 'B1'
 CELL_OVERALL_BUDGET = 'B2'
 CELL_OVERALL_REMAIN = 'B3'
-CELL_LAST_ALERT     = 'B12'
-CELL_LAST_RESET     = 'B13'
-CELL_STATUS_LOG     = 'B14'
+CELL_LAST_RESET     = 'B12'
+CELL_STATUS_LOG     = 'B13'
 
 TIME_FILTER_MAP = {1: 1, 2: 7, 3: 30}
 
@@ -178,7 +177,7 @@ def read_platform_configs(ws_control):
     except (ValueError, TypeError):
         global_cfg['overall_remaining'] = global_cfg['overall_budget']
 
-    global_cfg['last_reset_date'] = str(grid.get((13, 2), '') or '').strip()
+    global_cfg['last_reset_date'] = str(grid.get((12, 2), '') or '').strip()
 
     platform_configs = {}
     for plat_name, col_num in PLATFORM_COL_INDEX.items():
@@ -222,7 +221,7 @@ def read_platform_configs(ws_control):
 
 def update_status_log(ws_control):
     try:
-        ws_control.update_cell(14, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
+        ws_control.update_cell(13, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
     except:
         pass
 
@@ -240,7 +239,7 @@ def check_and_reset_daily_budget(ws_control, global_cfg, platform_configs):
             for _plat_name, cfg in platform_configs.items():
                 cfg['budget_remaining'] = cfg['budget_cap']
                 ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
-            ws_control.update_cell(13, 2, current_date_str)
+            ws_control.update_cell(12, 2, current_date_str)
             global_cfg['last_reset_date'] = current_date_str
             print(f"Daily Budget Reset: {current_date_str} | Overall: {global_cfg['overall_remaining']}$")
             return global_cfg, platform_configs
