@@ -61,7 +61,12 @@ os.makedirs(RESULTS_PATH, exist_ok=True)
 BKK_TZ = timezone(timedelta(hours=7))
 
 DEFAULT_BUDGET_LIMIT = 3
-APIFY_RATE_PER_RESULT = 0.004
+APIFY_RATE_PER_RESULT = {
+    'LinkedIn':  0.002,
+    'TikTok':    0.004,
+    'Instagram': 0.004,
+    'Facebook':  0.004,
+}
 
 CFG_RANGE = 'B1:F14'
 PLATFORM_COL_INDEX = {
@@ -294,7 +299,7 @@ def fetch_data(plat_name, keywords, max_results, days_back, plat_budget_remainin
                 continue
 
             success = False
-            estimated_apify_cost = max_results * APIFY_RATE_PER_RESULT
+            estimated_apify_cost = max_results * APIFY_RATE_PER_RESULT.get(plat_name, 0.004)
             if plat_budget_remaining < estimated_apify_cost:
                 print(f"  Skipping Apify for {plat_name} because platform budget ({plat_budget_remaining}$) is below estimated cost ({estimated_apify_cost}$)")
                 continue
