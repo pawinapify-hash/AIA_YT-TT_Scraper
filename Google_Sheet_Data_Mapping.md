@@ -6,7 +6,7 @@ This document specifies the exact cell coordinates, layout structure, data types
 
 ## 1. Core Structural Rules & Conventions
 
-* **Global Merged Rows (Rows 1–3, 12–13):** Data values are stored in and retrieved from **Column B** (the primary cell for the merged horizontal range `B:F`).
+* **Global Merged Rows (Rows 1–3, 13):** Data values are stored in and retrieved from **Column B** (the primary cell for the merged horizontal range `B:F`).
 * **Platform Column Indexing:**
   * **Column B:** Facebook
   * **Column C:** Instagram
@@ -31,11 +31,11 @@ This document specifies the exact cell coordinates, layout structure, data types
 | **6** | Platform Keywords | `B6:F6` | **Input (Read)** | String | Search terms/hashtags (e.g., `เอไอเอ,AIA,#AIA`). |
 | **7** | Platform Time Filter | `B7:F7` | **Input (Read)** | Enum / Integer | Time window scope: `1` = Day, `2` = Week, `3` = Month. |
 | **8** | Interval (Minutes) | `B8:F8` | **Input (Read)** | Integer | Execution cadence in minutes (e.g., `60`, `120`). |
-| **9** | Max Results | `B9:F9` | **Input (Read)** | Integer | Max items/posts to fetch per platform search. |
-| **10** | Platform Budget / Day | `B10:F10` | **Input (Read)** | Float / Null | Platform-specific daily budget cap. If **Blank/Null**, fallback to `Overall Budget` (`B2`). |
-| **11** | Today's Remaining Platform Budget | `B11:F11` | **Output (Write)** | Float / Null | Platform-specific remaining budget. Updated post-run. |
-| **12** | Last Reset Date | `B12` | **Output (Write)** | Timestamp | Timestamp when daily budgets were last reset (`YYYY-MM-DD HH:MM:SS`). |
-| **13** | Status | `B13` | **Output (Write)** | String | System execution message or error status log. |
+| **9** | Last Execution | `B9:F9` | **Output (Write)** | Timestamp | Per-platform timestamp of last scrape (`YYYY-MM-DD HH:MM:SS`). Blank = scrape immediately. |
+| **10** | Max Results | `B10:F10` | **Input (Read)** | Integer | Max items/posts to fetch per platform search. |
+| **11** | Platform Budget / Day | `B11:F11` | **Input (Read)** | Float / Null | Platform-specific daily budget cap. If **Blank/Null**, fallback to `Overall Budget` (`B2`). |
+| **12** | Today's Remaining Platform Budget | `B12:F12` | **Output (Write)** | Float / Null | Platform-specific remaining budget. Updated post-run. |
+| **13** | Last Reset Date | `B13` | **Output (Write)** | Timestamp | Timestamp when daily budgets were last reset (`YYYY-MM-DD HH:MM:SS`). |
 
 ---
 
@@ -47,12 +47,11 @@ This document specifies the exact cell coordinates, layout structure, data types
   * Overall Budget: `B2`
   * Today's Remaining Overall Budget: `B3`
 * **System Output Logs:**
-  * Last Reset Date: `B12`
-  * Global Status Log: `B13`
+  * Last Reset Date: `B13`
 
 ### Platform Specific Matrix (`B` to `F`)
-* **Facebook (`Column B`):** Status `B5` | Keywords `B6` | Time Filter `B7` | Interval `B8` | Max Results `B9` | Budget `B10` | Remaining `B11`
-* **Instagram (`Column C`):** Status `C5` | Keywords `C6` | Time Filter `C7` | Interval `C8` | Max Results `C9` | Budget `C10` | Remaining `C11`
-* **YouTube (`Column D`):** Status `D5` | Keywords `D6` | Time Filter `D7` | Interval `D8` | Max Results `D9` | Budget `D10` | Remaining `D11`
-* **TikTok (`Column E`):** Status `E5` | Keywords `E6` | Time Filter `E7` | Interval `E8` | Max Results `E9` | Budget `E10` | Remaining `E11`
-* **LinkedIn (`Column F`):** Status `F5` | Keywords `F6` | Time Filter `F7` | Interval `F8` | Max Results `F9` | Budget `F10` | Remaining `F11`
+* **Facebook (`Column B`):** Status `B5` | Keywords `B6` | Time Filter `B7` | Interval `B8` | Last Exec `B9` | Max Results `B10` | Budget `B11` | Remaining `B12`
+* **Instagram (`Column C`):** Status `C5` | Keywords `C6` | Time Filter `C7` | Interval `C8` | Last Exec `C9` | Max Results `C10` | Budget `C11` | Remaining `C12`
+* **YouTube (`Column D`):** Status `D5` | Keywords `D6` | Time Filter `D7` | Interval `D8` | Last Exec `D9` | Max Results `D10` | Budget `D11` | Remaining `D12`
+* **TikTok (`Column E`):** Status `E5` | Keywords `E6` | Time Filter `E7` | Interval `E8` | Last Exec `E9` | Max Results `E10` | Budget `E11` | Remaining `E12`
+* **LinkedIn (`Column F`):** Status `F5` | Keywords `F6` | Time Filter `F7` | Interval `F8` | Last Exec `F9` | Max Results `F10` | Budget `F11` | Remaining `F12`

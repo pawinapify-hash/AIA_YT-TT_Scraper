@@ -80,15 +80,15 @@ ROW_STATUS          = 5
 ROW_KEYWORDS        = 6
 ROW_TIME_FILTER     = 7
 ROW_INTERVAL        = 8
-ROW_MAX_RESULTS     = 9
-ROW_BUDGET          = 10
-ROW_REMAINING       = 11
-ROW_LAST_EXECUTION  = 13
+ROW_LAST_EXECUTION  = 9
+ROW_MAX_RESULTS     = 10
+ROW_BUDGET          = 11
+ROW_REMAINING       = 12
 
 CELL_SYS_STATUS     = 'B1'
 CELL_OVERALL_BUDGET = 'B2'
 CELL_OVERALL_REMAIN = 'B3'
-CELL_LAST_RESET     = 'B12'
+CELL_LAST_RESET     = 'B13'
 
 TIME_FILTER_MAP = {1: 1, 2: 7, 3: 30}
 
@@ -178,7 +178,7 @@ def read_platform_configs(ws_control):
     except (ValueError, TypeError):
         global_cfg['overall_remaining'] = global_cfg['overall_budget']
 
-    global_cfg['last_reset_date'] = str(grid.get((12, 2), '') or '').strip()
+    global_cfg['last_reset_date'] = str(grid.get((13, 2), '') or '').strip()
 
     platform_configs = {}
     for plat_name, col_num in PLATFORM_COL_INDEX.items():
@@ -249,7 +249,7 @@ def check_and_reset_daily_budget(ws_control, global_cfg, platform_configs):
             for _plat_name, cfg in platform_configs.items():
                 cfg['budget_remaining'] = cfg['budget_cap']
                 ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
-            ws_control.update_cell(12, 2, current_date_str)
+            ws_control.update_cell(13, 2, current_date_str)
             global_cfg['last_reset_date'] = current_date_str
             print(f"Daily Budget Reset: {current_date_str} | Overall: {global_cfg['overall_remaining']}$")
             return global_cfg, platform_configs
