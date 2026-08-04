@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from platform_config import get_apify_actor_config
 from apify_result_parser import normalize_apify_item
+from status_control import is_run_active
 
 warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -29,12 +30,6 @@ for pkg in needed_packages:
 import yt_dlp
 from apify_client import ApifyClient
 import gspread
-
-try:
-    from google.colab import drive, auth
-    from google.auth import default
-except ImportError:
-    pass
 
 from google.oauth2.service_account import Credentials
 
@@ -67,6 +62,30 @@ BKK_TZ = timezone(timedelta(hours=7))
 
 DEFAULT_BUDGET_LIMIT = 3
 APIFY_RATE_PER_RESULT = 0.004
+
+CFG_RANGE = 'B1:F14'
+PLATFORM_COL_INDEX = {
+    'Facebook':  2,
+    'Instagram': 3,
+    'YouTube':   4,
+    'TikTok':    5,
+    'LinkedIn':  6,
+}
+ROW_STATUS      = 5
+ROW_KEYWORDS    = 6
+ROW_TIME_FILTER = 7
+ROW_MAX_RESULTS = 9
+ROW_BUDGET      = 10
+ROW_REMAINING   = 11
+
+CELL_SYS_STATUS     = 'D1'
+CELL_OVERALL_BUDGET = 'D2'
+CELL_OVERALL_REMAIN = 'D3'
+CELL_LAST_ALERT     = 'D12'
+CELL_LAST_RESET     = 'D13'
+CELL_STATUS_LOG     = 'D14'
+
+TIME_FILTER_MAP = {1: 1, 2: 7, 3: 30}
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 creds = None
@@ -106,12 +125,6 @@ def sanitize_for_sheets(text):
         clean_text = f"'{clean_text}"
     return clean_text[:2500]
 
-def is_run_active(status):
-    if status is None:
-        return False
-    status_text = str(status).strip()
-    return "Start" in status_text or "green" in status_text.lower()
-
 def send_google_chat_message(message, webhook_url):
     if not webhook_url or not webhook_url.startswith("http"): return
     try:
@@ -139,140 +152,203 @@ def generate_summary_message(name_group, p_list, raw, unique, dup):
     msg += "Check details in Sheet Log"
     return msg
 
-def update_heartbeat(ws_control):
+def read_platform_configs(ws_control):
+    cells = ws_control.range(CFG_RANGE)
+    grid = {}
+    for c in cells:
+        grid[(c.row, c.col)] = c.value
+
+    global_cfg = {}
+    global_cfg['status'] = str(grid.get((1, 4), '') or '').strip()
+
+    raw_budget = grid.get((2, 4))
     try:
-        ws_control.update_cell(11, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
+        global_cfg['overall_budget'] = float(raw_budget) if raw_budget not in (None, '') else float(DEFAULT_BUDGET_LIMIT)
+    except (ValueError, TypeError):
+        global_cfg['overall_budget'] = float(DEFAULT_BUDGET_LIMIT)
+
+    raw_remain = grid.get((3, 4))
+    try:
+        global_cfg['overall_remaining'] = float(raw_remain) if raw_remain not in (None, '') else global_cfg['overall_budget']
+    except (ValueError, TypeError):
+        global_cfg['overall_remaining'] = global_cfg['overall_budget']
+
+    global_cfg['last_reset_date'] = str(grid.get((13, 4), '') or '').strip()
+
+    platform_configs = {}
+    for plat_name, col_num in PLATFORM_COL_INDEX.items():
+        status_val = str(grid.get((ROW_STATUS, col_num), '') or '').strip()
+        if not is_run_active(status_val):
+            continue
+
+        cfg = {'name': plat_name, 'col_num': col_num}
+
+        kw_raw = grid.get((ROW_KEYWORDS, col_num))
+        cfg['keywords'] = [k.strip() for k in str(kw_raw).split(',') if k.strip()] if kw_raw else []
+
+        time_val = grid.get((ROW_TIME_FILTER, col_num))
+        try:
+            time_val_int = int(time_val) if time_val not in (None, '') else 3
+            cfg['days_back'] = TIME_FILTER_MAP.get(time_val_int, 30)
+        except (ValueError, TypeError):
+            cfg['days_back'] = 30
+
+        max_res_val = grid.get((ROW_MAX_RESULTS, col_num))
+        try:
+            cfg['max_results'] = int(max_res_val) if max_res_val not in (None, '') else 5
+        except (ValueError, TypeError):
+            cfg['max_results'] = 5
+
+        budget_val = grid.get((ROW_BUDGET, col_num))
+        try:
+            cfg['budget_cap'] = float(budget_val) if budget_val not in (None, '') else global_cfg['overall_budget']
+        except (ValueError, TypeError):
+            cfg['budget_cap'] = global_cfg['overall_budget']
+
+        remain_val = grid.get((ROW_REMAINING, col_num))
+        try:
+            cfg['budget_remaining'] = float(remain_val) if remain_val not in (None, '') else cfg['budget_cap']
+        except (ValueError, TypeError):
+            cfg['budget_remaining'] = cfg['budget_cap']
+
+        platform_configs[plat_name] = cfg
+
+    return global_cfg, platform_configs
+
+def update_status_log(ws_control):
+    try:
+        ws_control.update_cell(14, 4, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
     except:
         pass
 
-def check_and_reset_daily_budget(ws_control, budget_limit):
+def check_and_reset_daily_budget(ws_control, global_cfg, platform_configs):
     try:
         current_date = get_bkk_now()
         current_date_str = current_date.strftime('%Y-%m-%d')
 
-        try:
-            last_reset_str = ws_control.cell(12, 2).value
-            last_reset_date = str(last_reset_str).strip()[:10] if last_reset_str else None
-        except:
-            last_reset_date = None
+        last_reset_date = global_cfg.get('last_reset_date', '')
+        last_reset_date = last_reset_date[:10] if last_reset_date else None
 
         if last_reset_date != current_date_str:
-            ws_control.update_cell(10, 2, str(round(float(budget_limit), 4)))
-            ws_control.update_cell(12, 2, current_date_str)
-            print(f"Daily Budget Reset: {current_date_str} | Remaining: {budget_limit}$")
-            return float(budget_limit)
+            global_cfg['overall_remaining'] = global_cfg['overall_budget']
+            ws_control.update_cell(3, 4, str(round(global_cfg['overall_remaining'], 4)))
+            for _plat_name, cfg in platform_configs.items():
+                cfg['budget_remaining'] = cfg['budget_cap']
+                ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
+            ws_control.update_cell(13, 4, current_date_str)
+            global_cfg['last_reset_date'] = current_date_str
+            print(f"Daily Budget Reset: {current_date_str} | Overall: {global_cfg['overall_remaining']}$")
+            return global_cfg, platform_configs
     except Exception as e:
         print(f"Daily Budget Check Error: {e}")
 
     return None
 
-def fetch_data(platforms, keywords, max_res, days_back, budget_remaining):
+def fetch_data(plat_name, keywords, max_results, days_back, plat_budget_remaining, overall_remaining):
     all_videos = []
     cutoff_utc = datetime.now(timezone.utc) - timedelta(days=days_back)
-    estimated_apify_cost = max_res * APIFY_RATE_PER_RESULT
 
-    for plat in platforms:
-        for kw in keywords:
-            print(f"Searching '{kw}' on {plat}...")
+    for kw in keywords:
+        print(f"Searching '{kw}' on {plat_name}...")
 
-            if plat == 'YouTube':
-                success = False
-                for yt_key in YOUTUBE_API_KEYS:
-                    if not yt_key or "insert_" in yt_key: continue
-                    try:
-                        params = {'part': 'snippet', 'q': kw, 'key': yt_key, 'maxResults': max_res, 'type': 'video', 'publishedAfter': cutoff_utc.isoformat().replace('+00:00', 'Z')}
-                        res = requests.get("https://www.googleapis.com/youtube/v3/search", params=params).json()
+        if plat_name == 'YouTube':
+            success = False
+            for yt_key in YOUTUBE_API_KEYS:
+                if not yt_key or "insert_" in yt_key: continue
+                try:
+                    params = {'part': 'snippet', 'q': kw, 'key': yt_key, 'maxResults': max_results, 'type': 'video', 'publishedAfter': cutoff_utc.isoformat().replace('+00:00', 'Z')}
+                    res = requests.get("https://www.googleapis.com/youtube/v3/search", params=params).json()
 
-                        if 'error' in res:
-                            print(f"  YouTube Key (ending ...{yt_key[-4:]}) error: {res['error']['message']}")
-                            continue
-
-                        count_yt = 0
-                        for item in res.get('items', []):
-                            if count_yt >= max_res: break
-                            all_videos.append({
-                                'url': f"https://www.youtube.com/watch?v={item['id']['videoId']}",
-                                'title': item['snippet']['title'],
-                                'platform': 'YouTube',
-                                'user': item['snippet']['channelTitle'],
-                                'date': format_to_bkk(item['snippet']['publishedAt']),
-                                'image_url': item['snippet']['thumbnails']['high']['url'],
-                                'id': item['id']['videoId'],
-                                'is_old': False
-                            })
-                            count_yt += 1
-
-                        success = True
-                        break
-                    except Exception as e:
-                        print(f"  YouTube Request Error (Key ...{yt_key[-4:]}): {e}")
+                    if 'error' in res:
+                        print(f"  YouTube Key (ending ...{yt_key[-4:]}) error: {res['error']['message']}")
                         continue
 
-                if not success:
-                    print(f"  All YouTube API Keys exhausted or not configured!")
+                    count_yt = 0
+                    for item in res.get('items', []):
+                        if count_yt >= max_results: break
+                        all_videos.append({
+                            'url': f"https://www.youtube.com/watch?v={item['id']['videoId']}",
+                            'title': item['snippet']['title'],
+                            'platform': 'YouTube',
+                            'user': item['snippet']['channelTitle'],
+                            'date': format_to_bkk(item['snippet']['publishedAt']),
+                            'image_url': item['snippet']['thumbnails']['high']['url'],
+                            'id': item['id']['videoId'],
+                            'is_old': False
+                        })
+                        count_yt += 1
 
+                    success = True
+                    break
+                except Exception as e:
+                    print(f"  YouTube Request Error (Key ...{yt_key[-4:]}): {e}")
+                    continue
+
+            if not success:
+                print(f"  All YouTube API Keys exhausted or not configured!")
+
+        else:
+            actor, inp = get_apify_actor_config(plat_name, kw, max_results, days_back)
+            if not actor:
+                print(f"  No Apify actor configured for {plat_name} yet.")
+                continue
+
+            success = False
+            estimated_apify_cost = max_results * APIFY_RATE_PER_RESULT
+            if plat_budget_remaining < estimated_apify_cost:
+                print(f"  Skipping Apify for {plat_name} because platform budget ({plat_budget_remaining}$) is below estimated cost ({estimated_apify_cost}$)")
+                continue
+            if overall_remaining < estimated_apify_cost:
+                print(f"  Skipping Apify for {plat_name} because overall budget ({overall_remaining}$) is below estimated cost ({estimated_apify_cost}$)")
+                continue
+
+            for apify_token in APIFY_TOKENS:
+                if not apify_token or "insert_" in apify_token: continue
+                try:
+                    client = ApifyClient(apify_token)
+                    try:
+                        print(f"  Apify actor call: actor={actor}, keyword={kw}, input={json.dumps(inp, ensure_ascii=False)}")
+                    except Exception:
+                        print(f"  Apify actor call: actor={actor}, keyword={kw}, input={inp}")
+                    run = client.actor(actor).call(run_input=inp, timeout_secs=120)
+
+                    count_apify = 0
+                    for item in client.dataset(run["defaultDatasetId"]).list_items().items:
+                        if count_apify >= max_results: break
+                        if not item or 'error' in item: continue
+
+                        normalized = normalize_apify_item(item, plat_name, cutoff_utc)
+                        if normalized and normalized.get('url'):
+                            normalized['date'] = format_to_bkk(normalized.get('date'))
+                            if plat_name == 'LinkedIn' and normalized.get('is_old'):
+                                continue
+                            all_videos.append(normalized)
+                            count_apify += 1
+
+                    success = True
+                    break
+                except Exception as e:
+                    error_msg = str(e).replace('\n', ' | ')
+                    print(f"  Apify Token (ending ...{apify_token[-4:]}) error: {error_msg[:150]}...")
+                    continue
+
+            if not success:
+                print(f"  All Apify Tokens exhausted or not configured for {plat_name}!")
             else:
-                actor, inp = get_apify_actor_config(plat, kw, max_res, days_back)
-                if not actor:
-                    print(f"  No Apify actor configured for {plat} yet.")
-                    continue
+                plat_budget_remaining -= estimated_apify_cost
+                overall_remaining -= estimated_apify_cost
+                print(f"  Deducted {estimated_apify_cost}$ for Apify call | Platform budget: {plat_budget_remaining}$ | Overall budget: {overall_remaining}$")
+                if plat_budget_remaining < 0:
+                    plat_budget_remaining = 0.0
+                if overall_remaining < 0:
+                    overall_remaining = 0.0
 
-                success = False
-                estimated_apify_cost = max_res * APIFY_RATE_PER_RESULT
-                if budget_remaining < estimated_apify_cost:
-                    print(f"  Skipping Apify for {plat} because budget remaining ({budget_remaining}$) is below estimated cost ({estimated_apify_cost}$)")
-                    continue
-
-                for apify_token in APIFY_TOKENS:
-                    if not apify_token or "insert_" in apify_token: continue
-                    try:
-                        client = ApifyClient(apify_token)
-                        try:
-                            print(f"  Apify actor call: actor={actor}, keyword={kw}, input={json.dumps(inp, ensure_ascii=False)}")
-                        except Exception:
-                            print(f"  Apify actor call: actor={actor}, keyword={kw}, input={inp}")
-                        run = client.actor(actor).call(run_input=inp, timeout_secs=120)
-
-                        count_apify = 0
-                        for item in client.dataset(run["defaultDatasetId"]).list_items().items:
-                            if count_apify >= max_res: break
-                            if not item or 'error' in item: continue
-
-                            normalized = normalize_apify_item(item, plat, cutoff_utc)
-                            if normalized and normalized.get('url'):
-                                normalized['date'] = format_to_bkk(normalized.get('date'))
-                                if plat == 'LinkedIn' and normalized.get('is_old'):
-                                    continue
-                                all_videos.append(normalized)
-                                count_apify += 1
-
-                        success = True
-                        break
-                    except Exception as e:
-                        error_msg = str(e).replace('\n', ' | ')
-                        print(f"  Apify Token (ending ...{apify_token[-4:]}) error: {error_msg[:150]}...")
-                        continue
-
-                if not success:
-                    print(f"  All Apify Tokens exhausted or not configured for {plat}!")
-                else:
-                    budget_remaining -= estimated_apify_cost
-                    print(f"  Deducted {estimated_apify_cost}$ for Apify call, remaining budget: {budget_remaining}$")
-                    if budget_remaining < 0:
-                        budget_remaining = 0.0
-
-    return all_videos, budget_remaining
+    return all_videos, plat_budget_remaining, overall_remaining
 
 def main():
     global gc
 
-    if not SHEET_ID and 'auth' in globals():
-        auth.authenticate_user()
-        creds, _ = default()
-        gc = gspread.authorize(creds)
-        target_sheet_id = "1RwsclzY3ssqnXSccdsclk53Lg6CJUvhKy9TMRXXgp6k"
-    else:
-        target_sheet_id = SHEET_ID
+    target_sheet_id = SHEET_ID
 
     if not target_sheet_id:
         print("SHEET_ID not found - check configuration")
@@ -303,37 +379,32 @@ def main():
 
     while True:
         try:
-            update_heartbeat(ws_control)
-            config = ws_control.col_values(2)
-            status = str(config[0]).strip() if len(config) > 0 else "Stop"
+            update_status_log(ws_control)
+            global_cfg, platform_configs = read_platform_configs(ws_control)
 
-            if not is_run_active(status):
+            if not is_run_active(global_cfg['status']):
                 print(f"\nStop signal detected from Control_Panel. Exiting loop.")
                 break
 
-            platforms = [p.strip() for p in config[1].split(',')]
-            keywords = [k.strip() for k in config[2].split(',')]
+            platforms = list(platform_configs.keys())
+            if not platforms:
+                print(f"\nNo active platforms configured. Exiting loop.")
+                break
 
-            days_back = 1 if '1' in str(config[3]) else 7 if '2' in str(config[3]) else 30
-            max_res = int(config[6]) if str(config[6]).isdigit() else 5
-            run_mode = str(config[4]).strip()
+            reset_result = check_and_reset_daily_budget(ws_control, global_cfg, platform_configs)
+            if reset_result is not None:
+                global_cfg, platform_configs = reset_result
 
-            try:
-                budget_limit = float(config[7]) if len(config) > 7 and str(config[7]).strip() else DEFAULT_BUDGET_LIMIT
-            except (ValueError, TypeError):
-                budget_limit = DEFAULT_BUDGET_LIMIT
+            print(f"\n\nProcessing Batch: {get_bkk_now().strftime('%H:%M:%S')} (Platforms: {platforms}, Overall Budget: {global_cfg['overall_remaining']}$)")
 
-            try:
-                budget_remaining = float(config[8]) if len(config) > 8 and str(config[8]).strip() else float(budget_limit)
-            except:
-                budget_remaining = float(budget_limit)
-
-            reset_budget = check_and_reset_daily_budget(ws_control, budget_limit)
-            if reset_budget is not None:
-                budget_remaining = reset_budget
-
-            print(f"\n\nProcessing Batch: {get_bkk_now().strftime('%H:%M:%S')} (Max Results: {max_res}, Budget Remaining: {budget_remaining}$)")
-            raw_list, budget_remaining = fetch_data(platforms, keywords, max_res, days_back, budget_remaining)
+            all_raw = []
+            for plat_name, cfg in platform_configs.items():
+                videos, cfg['budget_remaining'], global_cfg['overall_remaining'] = fetch_data(
+                    plat_name, cfg['keywords'], cfg['max_results'], cfg['days_back'],
+                    cfg['budget_remaining'], global_cfg['overall_remaining']
+                )
+                all_raw.extend(videos)
+            raw_list = all_raw
             processed_urls = set(ws_data.col_values(7)[1:])
 
             unique_list, duplicate_list, seen_in_run = [], [], set()
@@ -385,10 +456,12 @@ def main():
                     print(f"  Sheet write error: {sheet_err}")
 
             try:
-                ws_control.update_cell(10, 2, str(round(budget_remaining, 4)))
-                print(f"Updated Today's Remaining Budget: {round(budget_remaining, 4)}$")
+                ws_control.update_cell(3, 4, str(round(global_cfg['overall_remaining'], 4)))
+                for _plat_name, cfg in platform_configs.items():
+                    ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
+                print(f"Updated budget state")
             except Exception as e:
-                print(f"Failed to persist today's remaining budget: {e}")
+                print(f"Failed to persist budget: {e}")
 
             if ENABLE_STATUS_MESSAGE:
                 msg_all = generate_summary_message("All Platforms", platforms, raw_list, unique_list, duplicate_list)
@@ -403,25 +476,8 @@ def main():
                 msg_tk = generate_summary_message("TikTok", tk_plats, tk_raw, tk_uni, tk_dup)
                 if msg_tk: send_google_chat_message(msg_tk, GOOGLE_CHAT_WEBHOOK_TIKTOK)
 
-            if 'Run Once' in run_mode:
-                print("\nRun Once finished. Updating status to Stop.")
-                try:
-                    ws_control.update_cell(1, 2, 'Stop')
-                except:
-                    pass
-                if not ('auth' in globals()):
-                    break
-
-            if not ('auth' in globals()):
-                print("\nServerless Mode finished 1 cycle. Keeping status Active for next Watchdog trigger.")
-                break
-            else:
-                if 'Run Once' not in run_mode:
-                    interval = int(config[5]) if str(config[5]).isdigit() else 60
-                    print(f"\nNext iteration in {interval} mins...")
-                    for _ in range(interval * 6):
-                        update_heartbeat(ws_control)
-                        time.sleep(10)
+            print("\nCycle complete. Exiting for Watchdog re-trigger.")
+            break
 
         except Exception as e:
             print(f"\nError: {e}")
