@@ -76,18 +76,19 @@ PLATFORM_COL_INDEX = {
     'TikTok':    5,
     'LinkedIn':  6,
 }
-ROW_STATUS      = 5
-ROW_KEYWORDS    = 6
-ROW_TIME_FILTER = 7
-ROW_MAX_RESULTS = 9
-ROW_BUDGET      = 10
-ROW_REMAINING   = 11
+ROW_STATUS          = 5
+ROW_KEYWORDS        = 6
+ROW_TIME_FILTER     = 7
+ROW_INTERVAL        = 8
+ROW_MAX_RESULTS     = 9
+ROW_BUDGET          = 10
+ROW_REMAINING       = 11
+ROW_LAST_EXECUTION  = 13
 
 CELL_SYS_STATUS     = 'B1'
 CELL_OVERALL_BUDGET = 'B2'
 CELL_OVERALL_REMAIN = 'B3'
 CELL_LAST_RESET     = 'B12'
-CELL_STATUS_LOG     = 'B13'
 
 TIME_FILTER_MAP = {1: 1, 2: 7, 3: 30}
 
@@ -215,15 +216,24 @@ def read_platform_configs(ws_control):
         except (ValueError, TypeError):
             cfg['budget_remaining'] = cfg['budget_cap']
 
+        interval_val = grid.get((ROW_INTERVAL, col_num))
+        try:
+            cfg['interval_min'] = max(int(interval_val) - 1, 1) if interval_val not in (None, '') else 60
+        except (ValueError, TypeError):
+            cfg['interval_min'] = 60
+
+        last_exec_val = grid.get((ROW_LAST_EXECUTION, col_num))
+        cfg['last_execution'] = None
+        if last_exec_val:
+            try:
+                cfg['last_execution'] = datetime.strptime(str(last_exec_val).strip()[:19], '%Y-%m-%d %H:%M:%S')
+                cfg['last_execution'] = cfg['last_execution'].replace(tzinfo=BKK_TZ)
+            except (ValueError, TypeError):
+                pass
+
         platform_configs[plat_name] = cfg
 
     return global_cfg, platform_configs
-
-def update_status_log(ws_control):
-    try:
-        ws_control.update_cell(13, 2, get_bkk_now().strftime('%Y-%m-%d %H:%M:%S'))
-    except:
-        pass
 
 def check_and_reset_daily_budget(ws_control, global_cfg, platform_configs):
     try:
@@ -383,7 +393,6 @@ def main():
 
     while True:
         try:
-            update_status_log(ws_control)
             global_cfg, platform_configs = read_platform_configs(ws_control)
 
             if not is_run_active(global_cfg['status']):
@@ -401,13 +410,25 @@ def main():
 
             print(f"\n\nProcessing Batch: {get_bkk_now().strftime('%H:%M:%S')} (Platforms: {platforms}, Overall Budget: {global_cfg['overall_remaining']}$)")
 
+            now = get_bkk_now()
             all_raw = []
+            scraped_platforms = []
             for plat_name, cfg in platform_configs.items():
+                last_exec = cfg.get('last_execution')
+                if last_exec is not None:
+                    elapsed = (now - last_exec).total_seconds()
+                    if elapsed < cfg['interval_min'] * 60:
+                        remaining = int(cfg['interval_min'] * 60 - elapsed)
+                        print(f"  Skipping {plat_name} — last run {last_exec.strftime('%H:%M:%S')}, next in {remaining}s")
+                        continue
+
                 videos, cfg['budget_remaining'], global_cfg['overall_remaining'] = fetch_data(
                     plat_name, cfg['keywords'], cfg['max_results'], cfg['days_back'],
                     cfg['budget_remaining'], global_cfg['overall_remaining']
                 )
                 all_raw.extend(videos)
+                cfg['last_execution'] = now
+                scraped_platforms.append(plat_name)
             raw_list = all_raw
             processed_urls = set(ws_data.col_values(7)[1:])
 
@@ -463,6 +484,9 @@ def main():
                 ws_control.update_cell(3, 2, str(round(global_cfg['overall_remaining'], 4)))
                 for _plat_name, cfg in platform_configs.items():
                     ws_control.update_cell(ROW_REMAINING, cfg['col_num'], str(round(cfg['budget_remaining'], 4)))
+                    if _plat_name in scraped_platforms and cfg.get('last_execution'):
+                        ws_control.update_cell(ROW_LAST_EXECUTION, cfg['col_num'],
+                            cfg['last_execution'].strftime('%Y-%m-%d %H:%M:%S'))
                 print(f"Updated budget state")
             except Exception as e:
                 print(f"Failed to persist budget: {e}")
