@@ -60,7 +60,7 @@ RESULTS_PATH = os.path.join(BASE_PATH, 'Results')
 os.makedirs(RESULTS_PATH, exist_ok=True)
 BKK_TZ = timezone(timedelta(hours=7))
 
-DEFAULT_BUDGET_LIMIT = 3
+DEFAULT_BUDGET_LIMIT = 2
 APIFY_RATE_PER_RESULT = {
     'LinkedIn':  0.002,
     'TikTok':    0.004,
